@@ -1,0 +1,39 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+
+/* --- HARD OVERRIDE: remove any patterned background (dashed diagonal lines) --- */
+html, body, #root {
+  background-image: none !important;
+}
+body::before, body::after, #root::before, #root::after {
+  content: none !important;
+  background-image: none !important;
+}
+
+/* --- HARD OVERRIDE: remove any patterned background (dashed diagonal lines) --- */
+html, body, #root {
+  background-image: none !important;
+}
+body::before, body::after, #root::before, #root::after {
+  content: none !important;
+  background-image: none !important;
+}
+
+
+/* --- UI Fix: weight + unit inline --- */
+.weight-inline{display:inline-flex;align-items:baseline;gap:.35rem;white-space:nowrap}
+.weight-inline .unit{font-size:.9em;opacity:.85}
+
+
+ /* --- Fullscreen Dashboard Layout --- */
+ .dashboard-wrap{height:calc(100vh - 88px); /* Header ca. */ overflow:hidden}
+ .dashboard-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;height:100%}
+ .col{display:grid;grid-template-rows:1fr 1fr;gap:16px;height:100%}
+ .card-fit{min-height:0;height:100%;overflow:hidden}
+ .card-fit .card-body{min-height:0;height:100%;overflow:hidden}
+ /* Charts/Recharts: niemals -1 Größe -> min-height setzen */
+ .chart-fit{min-height:220px;height:100%}
+

@@ -1,0 +1,21 @@
+﻿/* --- GLOBAL KILL SWITCH for any patterned/overlay background --- */
+html, body, #root {
+  background-image: none !important;
+  background: #020617 !important; /* slate-950 */
+}
+
+/* kill any pseudo overlay layers */
+*, *::before, *::after {
+  background-image: none !important;
+}
+
+/* if something draws lines via border/outline with dashed style */
+*, *::before, *::after {
+  outline: none !important;
+}
+
+/* if an overlay element uses SVG background via mask */
+*, *::before, *::after {
+  -webkit-mask-image: none !important;
+  mask-image: none !important;
+}

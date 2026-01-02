@@ -1,0 +1,325 @@
+﻿import assert from "node:assert/strict";
+import {
+  getMonthRange,
+  daysInMonthRange,
+  weightAtOrBefore,
+  startWeightMonth,
+  endWeightMonth,
+  fairScoreMonth,
+  performanceFactorMonth,
+  finalScoreMonth,
+} from "../src/utils/monthChallenge.js";
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------
+const EPS = 1e-6;
+const approx = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
+
+function addDaysISO(iso, n) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function mkDailyEntries(monthKey, startW, dailyDeltaFn) {
+  const { startISO } = getMonthRange(monthKey);
+  const days = daysInMonthRange(monthKey);
+  const out = [];
+  let w = startW;
+
+  // wir erstellen days+1 Einträge, damit 01.(FolgeMonat) dabei ist (wie eure Tests)
+  for (let i = 0; i < days + 1; i++) {
+    const iso = addDaysISO(startISO, i);
+    if (i > 0) w = dailyDeltaFn(w, i, iso);
+    out.push({ date: iso, weight: +w.toFixed(2) });
+  }
+  return out;
+}
+
+function mkSparseEntries(list) {
+  // list: [{date, weight}, ...]
+  return list.map(x => ({ date: x.date, weight: x.weight }));
+}
+
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+function expectedFairScore(sw, ew, days) {
+  const delta = sw - ew; // Abnahme positiv
+  if (Math.abs(delta) < 0.2) return 0;
+  const expected = sw * 0.01 * (days / 7);
+  return (delta / expected) * 100;
+}
+
+function expectedTolDownFromStartWeight(sw) {
+  // wie du es jetzt im System hast: max(0.05, 0.0005 * Startgewicht)
+  return Math.max(0.05, 0.0005 * sw);
+}
+
+function perfFromSimulation(monthKey, entries) {
+  const perf = performanceFactorMonth(entries, monthKey);
+  assert.ok(perf >= -EPS && perf <= 1 + EPS, "Perf muss in [0..1] sein");
+  return perf;
+}
+
+function logOK(name) {
+  console.log("✅", name);
+}
+
+function logFAIL(name, err) {
+  console.log("❌", name);
+  console.log("   ", err?.message || err);
+}
+
+// ------------------------------------------------------------
+// Tests
+// ------------------------------------------------------------
+let PASS = 0, FAIL = 0;
+
+async function test(name, fn) {
+  try {
+    await fn();
+    PASS++;
+    logOK(name);
+  } catch (e) {
+    FAIL++;
+    logFAIL(name, e);
+  }
+}
+
+function assertFinalEqualsBaseTimesPerf(entries, monthKey) {
+  const base = fairScoreMonth(entries, monthKey);
+  const perf = performanceFactorMonth(entries, monthKey);
+  const fin  = finalScoreMonth(entries, monthKey);
+
+  if (base == null || fin == null) return;
+  assert.ok(approx(fin, base * perf, 1e-9), `Final (${fin}) != Base*Perf (${base*perf})`);
+}
+
+// ------------------------------------------------------------
+// Suite
+// ------------------------------------------------------------
+console.log("\n==============================");
+console.log("MEGA TEST SUITE (Month Challenge)");
+console.log("==============================\n");
+
+// 1) getMonthRange / daysInMonthRange sanity
+await test("Month range + days: 2026-01 should be 31 days", () => {
+  const days = daysInMonthRange("2026-01");
+  assert.equal(days, 31);
+  const { startISO, endISO } = getMonthRange("2026-01");
+  assert.equal(startISO, "2026-01-01");
+  assert.equal(endISO, "2026-02-01");
+});
+
+await test("Month range + days: 2026-02 should be 28 days", () => {
+  const days = daysInMonthRange("2026-02");
+  assert.equal(days, 28);
+  const { startISO, endISO } = getMonthRange("2026-02");
+  assert.equal(startISO, "2026-02-01");
+  assert.equal(endISO, "2026-03-01");
+});
+
+// 2) weightAtOrBefore correctness
+await test("weightAtOrBefore picks last <= date", () => {
+  const entries = mkSparseEntries([
+    { date:"2026-01-01", weight:100 },
+    { date:"2026-01-10", weight:99 },
+    { date:"2026-01-20", weight:98 },
+  ]);
+  assert.equal(weightAtOrBefore(entries, "2026-01-01"), 100);
+  assert.equal(weightAtOrBefore(entries, "2026-01-05"), 100);
+  assert.equal(weightAtOrBefore(entries, "2026-01-10"), 99);
+  assert.equal(weightAtOrBefore(entries, "2026-01-19"), 99);
+  assert.equal(weightAtOrBefore(entries, "2026-01-20"), 98);
+  assert.equal(weightAtOrBefore(entries, "2025-12-31"), null);
+});
+
+// 3) startWeightMonth/endWeightMonth uses month boundaries (end inclusive)
+await test("startWeightMonth uses weight at or before 01.MM", () => {
+  const entries = mkSparseEntries([
+    { date:"2025-12-31", weight:101 },
+    { date:"2026-01-02", weight:100 },
+  ]);
+  assert.equal(startWeightMonth(entries, "2026-01"), 101);
+});
+
+await test("endWeightMonth uses weight at or before 01.(MM+1) (inclusive)", () => {
+  const entries = mkSparseEntries([
+    { date:"2026-01-31", weight:99.5 },
+    { date:"2026-02-01", weight:99.0 },
+    { date:"2026-02-02", weight:98.9 },
+  ]);
+  assert.equal(endWeightMonth(entries, "2026-01"), 99.0);
+});
+
+// 4) fairScoreMonth formula + tolerance 0.2kg
+await test("FairScore: abs(delta) < 0.2 returns 0", () => {
+  const entries = mkSparseEntries([
+    { date:"2026-01-01", weight:100.00 },
+    { date:"2026-02-01", weight:99.81 }, // delta=0.19
+  ]);
+  assert.equal(fairScoreMonth(entries, "2026-01"), 0);
+});
+
+await test("FairScore formula matches expected (example 120->117 in Jan)", () => {
+  const entries = mkSparseEntries([
+    { date:"2026-01-01", weight:120.0 },
+    { date:"2026-02-01", weight:117.0 },
+  ]);
+  const days = daysInMonthRange("2026-01");
+  const sw = 120.0, ew = 117.0;
+  const exp = expectedFairScore(sw, ew, days);
+  const got = fairScoreMonth(entries, "2026-01");
+  assert.ok(approx(got, exp, 1e-2), `got=${got} exp=${exp}`);
+});
+
+await test("FairScore negative when weight increases (80->80.5)", () => {
+  const entries = mkSparseEntries([
+    { date:"2026-01-01", weight:80.0 },
+    { date:"2026-02-01", weight:80.5 },
+  ]);
+  const got = fairScoreMonth(entries, "2026-01");
+  assert.ok(got < 0, "FairScore should be negative for weight gain");
+});
+
+// 5) performanceFactorMonth: threshold behavior (dynamic tolDown + tolUp=0.25)
+// We validate threshold by constructing one-day comparisons around tolDown and tolUp.
+await test("Perf: down-day increases when there is a clear daily drop", () => {
+  const monthKey = "2026-01";
+  const { startISO } = getMonthRange(monthKey);
+
+  // Fall 1: Minimaler Drop (soll meistens neutral bleiben)
+  const e1 = mkSparseEntries([
+    { date: startISO, weight: 158.00 },
+    { date: addDaysISO(startISO, 1), weight: 157.99 },
+    { date: addDaysISO(startISO, 2), weight: 157.99 },
+  ]);
+  const p1 = perfFromSimulation(monthKey, e1);
+
+  // Fall 2: Großer Drop (MUSS als DownDay zählen, egal welche sinnvolle tolDown-Logik)
+  const e2 = mkSparseEntries([
+    { date: startISO, weight: 158.00 },
+    { date: addDaysISO(startISO, 1), weight: 157.00 }, // -1.00 kg
+    { date: addDaysISO(startISO, 2), weight: 157.00 },
+  ]);
+  const p2 = perfFromSimulation(monthKey, e2);
+
+  assert.ok(p2 > p1 + 0.01, `Expected perf to increase with clear drop. p1=${p1} p2=${p2}`);
+});
+await test("Perf: up-day counted only when wt >= wy + 0.25", () => {
+  const monthKey = "2026-01";
+  const { startISO } = getMonthRange(monthKey);
+  const sw = 100.0;
+
+  // increase by 0.24 -> should NOT count as up-day
+  const e1 = mkSparseEntries([
+    { date: startISO, weight: sw },
+    { date: addDaysISO(startISO, 1), weight: +(sw + 0.24).toFixed(2) },
+    { date: addDaysISO(startISO, 2), weight: +(sw + 0.24).toFixed(2) },
+    { date: addDaysISO(startISO, 31), weight: +(sw + 0.24).toFixed(2) },
+  ]);
+  const p1 = perfFromSimulation(monthKey, e1);
+
+  // increase by 0.26 -> should count as up-day, perf should be lower or clamp to 0
+  const e2 = mkSparseEntries([
+    { date: startISO, weight: sw },
+    { date: addDaysISO(startISO, 1), weight: +(sw + 0.26).toFixed(2) },
+    { date: addDaysISO(startISO, 2), weight: +(sw + 0.26).toFixed(2) },
+    { date: addDaysISO(startISO, 31), weight: +(sw + 0.26).toFixed(2) },
+  ]);
+  const p2 = perfFromSimulation(monthKey, e2);
+
+  assert.ok(p2 <= p1 + 1e-6, `Expected perf not higher when adding an up-day. p1=${p1} p2=${p2}`);
+});
+
+// 6) Invariant FinalScore = FairScore * PerfFactor
+await test("Invariant: FinalScore == FairScore * PerfFactor (daily constant drop)", () => {
+  const monthKey = "2026-01";
+  const entries = mkDailyEntries(monthKey, 158.0, (w) => w - 0.12);
+  assertFinalEqualsBaseTimesPerf(entries, monthKey);
+});
+
+await test("Invariant: FinalScore == FairScore * PerfFactor (endspurt)", () => {
+  const monthKey = "2026-01";
+  const entries = mkDailyEntries(monthKey, 158.0, (w, i) => {
+    // 21 Tage quasi neutral, danach -0.30
+    if (i <= 21) return w;
+    return w - 0.30;
+  });
+  assertFinalEqualsBaseTimesPerf(entries, monthKey);
+});
+
+// 7) Behavior: konstant > endspurt (should hold on perf & final)
+await test("Konstant should beat Endspurt in Perf & usually Final", () => {
+  const monthKey = "2026-01";
+  const konstant = mkDailyEntries(monthKey, 158.0, (w) => w - 0.12);
+  const endspurt = mkDailyEntries(monthKey, 158.0, (w, i) => (i <= 21 ? w : w - 0.30));
+
+  const pk = performanceFactorMonth(konstant, monthKey);
+  const pe = performanceFactorMonth(endspurt, monthKey);
+  assert.ok(pk > pe, `Expected pk > pe, got pk=${pk} pe=${pe}`);
+
+  const fk = finalScoreMonth(konstant, monthKey);
+  const fe = finalScoreMonth(endspurt, monthKey);
+  assert.ok(fk > fe, `Expected fk > fe, got fk=${fk} fe=${fe}`);
+});
+
+// 8) Edge cases: no / too few data
+await test("No entries -> base null, perf 0, final null", () => {
+  const monthKey = "2026-01";
+  const entries = [];
+  assert.equal(fairScoreMonth(entries, monthKey), null);
+  assert.equal(performanceFactorMonth(entries, monthKey), 0);
+  assert.equal(finalScoreMonth(entries, monthKey), null);
+});await test("One entry -> base null, perf 0, final null", () => {
+  const monthKey = "2026-01";
+  const entries = mkSparseEntries([{ date:"2026-01-01", weight:100 }]);
+  assert.equal(fairScoreMonth(entries, monthKey), null);
+  assert.equal(performanceFactorMonth(entries, monthKey), 0);
+  assert.equal(finalScoreMonth(entries, monthKey), null);
+});// 9) Random stress test
+await test("Random stress: 200 random months should not crash, invariants hold", () => {
+  const months = ["2026-01","2026-02","2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10","2026-11","2026-12"];
+  for (let t=0; t<200; t++){
+    const monthKey = months[Math.floor(Math.random()*months.length)];
+    const days = daysInMonthRange(monthKey);
+    const startW = +(50 + Math.random()*150).toFixed(2); // 50..200
+    let w = startW;
+
+    // create a mixed pattern with noise + occasional jumps
+    const entries = [];
+    const { startISO } = getMonthRange(monthKey);
+    for (let i=0; i<days+1; i++){
+      const iso = addDaysISO(startISO, i);
+
+      // 15% chance we "skip" that day (simulate missing entry)
+      const skip = Math.random() < 0.15;
+      // random walk: small daily change + occasional spike
+      const drift = (Math.random() - 0.55) * 0.20; // slight bias to down
+      const spike = (Math.random() < 0.05) ? (Math.random() - 0.5) * 1.0 : 0.0;
+      w = +(w + drift + spike).toFixed(2);
+
+      if (!skip) entries.push({ date: iso, weight: w });
+    }
+
+    const base = fairScoreMonth(entries, monthKey);
+    const perf = performanceFactorMonth(entries, monthKey);
+    const fin  = finalScoreMonth(entries, monthKey);
+
+    assert.ok(perf >= -EPS && perf <= 1 + EPS);
+
+    if (base != null && fin != null) {
+      assert.ok(approx(fin, base*perf, 1e-9), "Final must equal base*perf");
+    }
+  }
+});
+
+// ------------------------------------------------------------
+console.log("\n==============================");
+console.log(`DONE. PASS=${PASS} FAIL=${FAIL}`);
+console.log("==============================\n");
+
+if (FAIL > 0) process.exit(1);
+
+

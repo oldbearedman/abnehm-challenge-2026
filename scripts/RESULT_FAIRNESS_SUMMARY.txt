@@ -1,0 +1,42 @@
+﻿✅ AUSWERTUNG (Fairness-System)
+
+1) Konstant
+- FairScore: 45.73%
+- Perf:      1.0000
+- Final:     45.73%
+➡️ Perf macht genau das Richtige: wer konstant ist, bekommt keinen Abzug.
+
+2) Endspurt-only
+- FairScore: 57.17% (weil 7er Trend am Ende stark ist)
+- Perf:      0.8333
+- Final:     47.64%
+➡️ Endspurt wird spürbar bestraft (ca. -16.7% auf die Leistung).
+   ABER: bei deinen Testdaten ist es NICHT "3 Wochen chillen + 1 Woche hungern",
+   weil du mehrere "down-days" drin hast (27, 29, 31, 01.02).
+   Deshalb kommt Perf noch relativ hoch raus.
+
+3) Gemischt
+- FairScore: 17.15%
+- Perf:      0.5000
+- Final:     8.57%
+➡️ Genau wie gedacht: viel hoch/runter -> nur halbe Konstanz.
+
+4) Zunahme
+- FairScore: -1.64%
+- Perf:      0.6667
+- Final:     -1.09%
+➡️ Das ist mathematisch sauber: wenn jemand zunimmt, bleibt das Ergebnis negativ.
+   (Das ist fairer als auf 0 zu clampen, weil "zunehmen" sonst keine Konsequenz hätte.)
+
+✅ WICHTIGES FAZIT:
+Dein System funktioniert korrekt.
+FinalScore = FairScore * Perf-Faktor passt in allen Fällen.
+
+🔧 OPTIONAL (wenn du "Endspurt-only" härter bestrafen willst):
+- Perf-Faktor aktuell zählt NUR Tage, an denen ein Messwert für gestern UND heute existiert.
+  Wenn jemand 3 Wochen nicht wiegt, kann er den Perf-Faktor nicht stark verlieren.
+  Lösung wäre: fehlende Tage als "nicht-down" werten (also 0), oder
+  Mindestanzahl Wiegetage pro Monat erzwingen (z.B. >= 10), sonst Perf = 0.
+
+Wenn du willst, mache ich dir direkt einen zusätzlichen Testdatensatz "echter Endspurt"
+(3 Wochen exakt gleiches Gewicht + 1 Woche runter) und wir schauen, wie weit Perf sinkt.
