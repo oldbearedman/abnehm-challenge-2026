@@ -86,7 +86,7 @@ export default function Setup({ participants, onLogin }) {
                     className="w-full p-4 rounded-xl border-2 flex items-center justify-between transition-all border-slate-700 bg-slate-800 hover:border-blue-500 hover:bg-slate-700 text-slate-200"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-full bg-blue-900/300/20 text-blue-400">
+                      <div className="p-2 rounded-full bg-blue-900/20 text-blue-400">
                         <User size={20} />
                       </div>
                       <div className="flex flex-col items-start">
