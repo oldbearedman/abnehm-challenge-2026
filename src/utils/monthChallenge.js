@@ -19,10 +19,9 @@ export function dateFromMonthKey(key) {
 export function getMonthRange(monthKey) {
   const start = dateFromMonthKey(monthKey);
   const endExclusive = new Date(start.getFullYear(), start.getMonth() + 1, 1);
-  const endInclusive = new Date(endExclusive.getFullYear(), endExclusive.getMonth(), endExclusive.getDate()); // same day object (we use ISO string)
   return {
     startISO: toISODate(start),
-    endISO: toISODate(endExclusive), // important: we use this as INCLUSIVE boundary by comparing <=
+    endISO: toISODate(endExclusive), 
   };
 }
 
@@ -49,13 +48,13 @@ export function weightAtOrBefore(entries, dateISO) {
   return last ? last.weight : null;
 }
 
-// Entries im Monatsfenster: startISO <= date <= endISO (endISO = 01 nächster Monat, zählt noch rein!)
+// Entries im Monatsfenster: startISO <= date <= endISO
 export function entriesInMonth(entries, monthKey) {
   const { startISO, endISO } = getMonthRange(monthKey);
   return sortEntries(entries).filter((e) => e.date >= startISO && e.date <= endISO);
 }
 
-// Trend kg: aus den letzten N Einträgen innerhalb des Monatsfensters bis max endISO
+// Trend kg
 export function trendKgMonth(entries, monthKey) {
   const sw = startWeightMonth(entries, monthKey);
   const ew = endWeightMonth(entries, monthKey);
@@ -63,23 +62,19 @@ export function trendKgMonth(entries, monthKey) {
   return sw - ew;
 }
 
-// Startgewicht für den Monat:
-// = Gewicht am Startdatum (01.MM) ODER zuletzt davor.
-// (Damit wird Februar automatisch mit dem 01.02 Wert gestartet, wenn er existiert.)
+// Startgewicht für den Monat
 export function startWeightMonth(entries, monthKey) {
   const { startISO } = getMonthRange(monthKey);
   return weightAtOrBefore(entries, startISO);
 }
 
-// Endgewicht für den Monat:
-// = Gewicht am Enddatum (01.(MM+1)) ODER zuletzt davor.
+// Endgewicht für den Monat
 export function endWeightMonth(entries, monthKey) {
   const { endISO } = getMonthRange(monthKey);
   return weightAtOrBefore(entries, endISO);
 }
 
-// Fair-Score für den Monat:
-// expected = startWeightMonth * 0.01 * (daysInMonth/7)
+// Fair-Score für den Monat
 export function fairScoreMonth(entries, monthKey) {
   const sw = startWeightMonth(entries, monthKey);
   const ew = endWeightMonth(entries, monthKey);
@@ -104,21 +99,20 @@ export function fairScoreMonth(entries, monthKey) {
 /**
  * Leistungs-Konsistenz-Faktor (0..1)
  * Zählt pro Kalendertag im Monat: wenn Gewicht < Gewicht vom Vortag => "Abnahme-Tag"
- * fehlende Tage zählen NICHT als Abnahme-Tag (da ihr täglich eintragt ist das ok)
+ * FIX: Zählt nun auch den Übergang zum 1. des Folgemonats
  */
 export function performanceFactorMonth(entries, monthKey) {
   if (!entries || entries.length === 0) return 0;
 
   const { startISO } = getMonthRange(monthKey);
   const days = daysInMonthRange(monthKey);
-  if (!days || days <= 1) return 0;
+  
+  if (!days || days < 1) return 0;
 
   const startW = startWeightMonth(entries, monthKey);
   if (startW == null) return 0;
 
-  // Fair für 60–158 kg:
-  // Down-Day: max(0.05 kg, 0.05% vom Startgewicht)
-  // Up-Day:   +0.25 kg
+  // Toleranzen
   const tolDown = Math.max(0.05, startW * 0.0005);
   const tolUp   = 0.25;
 
@@ -131,25 +125,39 @@ export function performanceFactorMonth(entries, monthKey) {
   let downDays = 0;
   let upDays = 0;
 
-  for (let i = 1; i < days; i++) {
+  // FIX: Schleife läuft bis EINSCHLIESSLICH 'days' (um den letzten Tag zu erfassen)
+  for (let i = 1; i <= days; i++) {
     const today = addDaysISO(startISO, i);
     const yesterday = addDaysISO(startISO, i - 1);
 
     const wt = weightAtOrBefore(entries, today);
     const wy = weightAtOrBefore(entries, yesterday);
+    
     if (wt == null || wy == null) continue;
 
-    if (wt <= wy - tolDown) downDays++;
-    else if (wt >= wy + tolUp) upDays++;
+    // FIX: Runden gegen JS-Fehler
+    const diff = Number((wt - wy).toFixed(2));
+
+    // KORREKTUR: ZURÜCK ZUR STRENGEN LOGIK!
+    // Nur echte Abnahme (> tolDown) zählt als Punkt.
+    // Gleichstand (0.0) zählt NICHT als Punkt (ist neutral).
+    if (diff <= -tolDown) {
+       downDays++;
+    } 
+    // Echte Zunahme
+    else if (diff >= tolUp) {
+       upDays++;
+    }
   }
 
-  const comparisons = days - 1;
+  const comparisons = days; 
+  
   const raw = (downDays - upDays) / comparisons;
-
   return Math.max(0, Math.min(1, raw));
-} /**
+}
+
+/**
  * FinalScore (%) = FairScore (%) * Leistungsfaktor (0..1)
- * -> belohnt konstantes Abnehmen über den Monat, verhindert "Endspurt-only"
  */
 export function finalScoreMonth(entries, monthKey) {
   const base = fairScoreMonth(entries, monthKey);

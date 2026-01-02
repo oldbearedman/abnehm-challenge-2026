@@ -19,6 +19,9 @@ import {
   startWeightMonth,
   endWeightMonth,
   finalScoreMonth,
+  // NEU: Import der Einzel-Funktionen für die Anzeige
+  fairScoreMonth,
+  performanceFactorMonth,
   toISODate
 } from "./utils/monthChallenge";
 
@@ -97,8 +100,12 @@ export default function App() {
       // Monatswerte
       const msw = startWeightMonth(entries, key);
       const mew = endWeightMonth(entries, key);
-      const fair = finalScoreMonth(entries, key);
       const loss = (msw != null && mew != null) ? msw - mew : 0;
+
+      // NEU: Detaillierte Aufschlüsselung der Scores
+      const rawFair = fairScoreMonth(entries, key);          // Der "Mengen"-Score
+      const perf = performanceFactorMonth(entries, key);     // Der "Qualitäts"-Faktor
+      const final = finalScoreMonth(entries, key);           // Das Endergebnis
 
       let lastUpdateDate = p.joinedAt;
       if (entries.length) lastUpdateDate = entries[entries.length - 1].date;
@@ -112,7 +119,12 @@ export default function App() {
         // Monatswerte für Tabelle & Logic
         monthStartWeight: msw,
         monthEndWeight: mew,
-        fairScore: fair,
+        
+        // Scores
+        fairScore: final,      // WICHTIG: "fairScore" bleibt das Endergebnis für die Sortierung!
+        rawFairScore: rawFair, // NEU: Für die Detail-Anzeige
+        perfScore: perf,       // NEU: Für die Detail-Anzeige
+        
         loss: loss,
         lastUpdateDate
       };
@@ -147,12 +159,11 @@ export default function App() {
       const key = monthKey;
       const { endISO } = getMonthRange(key);
 
-const allHaveEnd = leaderboard.length > 0 && leaderboard.every((p) => 
-  (p.entries || []).some((e) => e.date === endISO)
-);
+      const allHaveEnd = leaderboard.length > 0 && leaderboard.every((p) => 
+        (p.entries || []).some((e) => e.date >= endISO)
+      );
 
-// Wenn noch nicht alle gewogen haben -> abbrechen
-if (!allHaveEnd) return;
+      if (!allHaveEnd) return;
 
       const winner = leaderboard.find((p) => p.fairScore != null);
       if (!winner) return;
@@ -228,16 +239,12 @@ if (!allHaveEnd) return;
     return <ProfileSelect participants={participants} onLogin={handleLogin} />;
   }
 
-const activeName = leaderboard.find((p) => p.id === activeId)?.name || activeId;
+  const activeName = leaderboard.find((p) => p.id === activeId)?.name || activeId;
   
-  // NEU: Wir berechnen BEIDES: Aktuelles Gesamtgewicht & Gesamtabnahme
   const groupStats = leaderboard.reduce(
     (acc, p) => {
-      // Nur zählen, wenn User ein aktuelles Gewicht hat
       if (p.currentWeight > 0) {
         acc.totalCurrent += p.currentWeight;
-        
-        // Abnahme berechnen (Start - Aktuell)
         if (p.startWeight > 0) {
           const diff = p.startWeight - p.currentWeight;
           acc.totalLoss += Math.max(0, diff);
@@ -253,7 +260,6 @@ const activeName = leaderboard.find((p) => p.id === activeId)?.name || activeId;
       <div className="min-h-screen bg-slate-950 text-slate-200">
         <Header
           activeName={activeName}
-          // NEU: Wir übergeben beide Werte einzeln
           totalWeight={groupStats.totalCurrent}
           totalLossKg={groupStats.totalLoss}
           myProfile={leaderboard.find((p) => p.id === activeId) || null}

@@ -1,12 +1,6 @@
 ﻿export const PREDEFINED_USERS = ["Olivia", "Taylor", "Brandon"];
 export const CHALLENGE_START = "2026-01-01";
 
-export const PINS = {
-  Brandon: "9627",
-  Olivia: "1212",
-  Taylor: "9627"
-};
+// Die PINS wurden entfernt, da nicht genutzt.
 
 export const getCollectionPath = () => ["participants"];
-
-
