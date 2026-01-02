@@ -1,79 +1,90 @@
-﻿import React, { useMemo } from "react";
-import { Trophy, Clock, AlertCircle } from "lucide-react";
-import { getDaysDifference, getTimeAgoString } from "../utils/date";
-import TrendBox from "./TrendBox";
+﻿import React from "react";
+import { Trophy, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
-export default function LeaderboardTable({ leaderboard, activeId, scrollable = false, monthKey }) {
-  const myProfile = useMemo(() => {
-    return leaderboard?.find((p) => p.id === activeId) || null;
-  }, [leaderboard, activeId]);
-
+export default function LeaderboardTable({ leaderboard, activeId, compact = false }) {
+  
   return (
-    <div className={`bg-slate-900 rounded-xl border border-white/10 shadow-sm overflow-hidden ${scrollable ? "h-full" : ""} flex flex-col`}>
-      <div className="p-4 border-b border-white/10 shrink-0">
-        <h2 className="text-base font-bold text-white flex items-center gap-2">
-          <Trophy size={18} className="text-amber-500" /> Details
-        </h2>
+    <div className="w-full text-left border-collapse">
+      {/* Tabellen-Header */}
+      <div className="grid grid-cols-12 gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 px-2 whitespace-nowrap">
+        <div className="col-span-1 text-center">#</div>
+        {/* Name etwas schmaler (3), dafür Ende breiter (3) */}
+        <div className="col-span-3">Name</div>
+        <div className="col-span-3 text-right hidden sm:block">Monat-Start</div>
+        <div className="col-span-3 text-right">Monat-Ende</div>
+        <div className="col-span-2 text-right">Fair-Score</div>
       </div>
 
-      <div className={scrollable ? "flex-1 min-h-0 overflow-auto" : "overflow-x-auto"}>
-        <table className="w-full text-left">
-          <thead className="bg-slate-800/50 text-slate-500 text-xs uppercase font-semibold sticky top-0">
-            <tr>
-              <th className="px-4 py-3">#</th>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Monat-Start</th>
-              <th className="px-4 py-3">Monat-Ende</th>
-              <th className="px-4 py-3 text-right">Fair-Score</th>
-            </tr>
-          </thead>
+      <div className="space-y-1">
+        {leaderboard.map((player, index) => {
+          const isMe = player.id === activeId;
+          const score = player.fairScore || 0;
+          
+          let scoreClass = "bg-slate-800 text-slate-400";
+          if (score > 0) scoreClass = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+          if (score < 0) scoreClass = "bg-rose-500/10 text-rose-400 border border-rose-500/20";
 
-          <tbody className="divide-y divide-slate-800">
-            {(leaderboard || []).map((p, idx) => {
-              const daysAgo = getDaysDifference(p.lastUpdateDate);
-              const isStale = daysAgo > 7;
+          const lastDate = player.lastUpdateDate 
+            ? new Date(player.lastUpdateDate).toLocaleDateString("de-DE", { day: "2-digit", month: "short" })
+            : "-";
+            
+          const isToday = player.lastUpdateDate === new Date().toISOString().split("T")[0];
 
-              return (
-                <tr key={p.id} className={`hover:bg-slate-800/50 transition-colors ${p.id === activeId ? "bg-blue-900/30" : ""}`}>
-                  <td className="px-4 py-4 font-medium text-slate-500">{idx + 1}.</td>
+          return (
+            <div
+              key={player.id}
+              className={`grid grid-cols-12 gap-2 items-center p-3 rounded-lg border transition-all ${
+                isMe
+                  ? "bg-blue-500/10 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                  : "bg-slate-800/30 border-white/5 hover:bg-slate-800/50"
+              }`}
+            >
+              {/* PLATZIERUNG */}
+              <div className="col-span-1 text-center font-bold text-slate-400">
+                {index + 1}.
+              </div>
 
-                  <td className="px-4 py-4 font-bold text-slate-200">
-                    {p.name}
-                    {p.id === activeId && (
-                      <span className="ml-2 text-xs font-normal text-blue-400 bg-blue-900/30 border border-blue-800 px-2 py-0.5 rounded-full">
-                        Du
-                      </span>
-                    )}
-                  </td>
+              {/* NAME */}
+              <div className="col-span-3 flex flex-col justify-center min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`font-bold truncate ${isMe ? "text-white" : "text-slate-200"}`}>
+                    {player.name}
+                  </span>
+                  {isMe && (
+                    <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full font-bold hidden xl:inline-block">
+                      Du
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                  <td className="px-4 py-4 text-slate-500">{p.monthStartWeight ?? "—"} kg</td>
+              {/* STARTGEWICHT */}
+              <div className="col-span-3 text-right hidden sm:block">
+                <div className="text-slate-400 text-sm font-medium">
+                  {player.monthStartWeight ? player.monthStartWeight.toFixed(2) : "-"} <span className="text-xs text-slate-600">kg</span>
+                </div>
+              </div>
 
-                  <td className="px-4 py-4">
-                    <div className="text-white font-medium">{p.monthEndWeight ?? "—"} kg</div>
-                    <div className={`text-xs flex items-center gap-1 mt-0.5 ${isStale ? "text-red-400 font-semibold" : "text-slate-500"}`}>
-                      {isStale ? <AlertCircle size={10} /> : <Clock size={10} />}
-                      {getTimeAgoString(p.lastUpdateDate)}
-                    </div>
-                  </td>
+              {/* ENDGEWICHT (Jetzt breiter: col-span-3) */}
+              <div className="col-span-3 text-right">
+                <div className="text-white font-bold text-sm">
+                  {player.monthEndWeight ? player.monthEndWeight.toFixed(2) : "-"} <span className="text-xs text-slate-500">kg</span>
+                </div>
+                <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1">
+                  {isToday && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                  {isToday ? "Heute" : lastDate}
+                </div>
+              </div>
 
-		<td className="px-4 py-4 text-right">
-			<span className="text-xs bg-green-900/30 border border-green-900/40 px-2 py-1 rounded font-bold text-green-300">
-    {/* Prüfen ob null ODER NaN */}
-    {(p.fairScore == null || isNaN(p.fairScore)) ? "—" : `${Math.round(p.fairScore)}%`}
-		</span>
-			</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="shrink-0 p-3 border-t border-white/10 bg-slate-950/20">
-        <TrendBox 
-          entries={myProfile?.entries || []} 
-          monthKey={monthKey} 
-        />
+              {/* SCORE */}
+              <div className="col-span-2 flex justify-end">
+                <div className={`px-2 py-1 rounded-md text-xs font-bold tabular-nums min-w-[50px] text-center ${scoreClass}`}>
+                  {score.toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,149 +1,116 @@
-﻿import React, { useEffect, useState } from "react";
-import { Trophy, Medal } from "lucide-react";
+﻿import React from "react";
+import { Trophy, Medal, Crown } from "lucide-react";
 
-// Hilfskomponente für einen einzelnen Podest-Platz
-const PodiumStep = ({ participant, rank, theme, animate, delay }) => {
-  if (!participant) return null;
+export default function Podium({ participants }) {
+  const safeList = participants || [];
+  const topThree = safeList.slice(0, 3);
 
-  // Dynamische Klassen basierend auf dem Rang (Gold/Silber/Bronze Theme)
-  const themeClasses = {
-    gold: {
-      container: "from-amber-500/20 to-amber-500/5 border-amber-500/50 shadow-[0_0_30px_rgba(245,158,11,0.2)]",
-      text: "text-amber-400",
-      height: "h-56", // Am höchsten
-      icon: <Trophy className="w-8 h-8 text-amber-400 mb-2 drop-shadow-glow" />,
-      rankSize: "text-8xl"
-    },
-    silver: {
-      container: "from-slate-400/20 to-slate-400/5 border-slate-400/50 shadow-[0_0_30px_rgba(148,163,184,0.2)]",
-      text: "text-slate-300",
-      height: "h-44", // Mittel
-      icon: <Medal className="w-6 h-6 text-slate-300 mb-2" />,
-      rankSize: "text-7xl"
-    },
-    bronze: {
-      container: "from-orange-700/20 to-orange-700/5 border-orange-700/50 shadow-[0_0_30px_rgba(194,65,12,0.2)]",
-      text: "text-orange-400",
-      height: "h-36", // Am niedrigsten
-      icon: <Medal className="w-6 h-6 text-orange-400 mb-2" />,
-      rankSize: "text-7xl"
-    },
+  const filledPodium = [
+    topThree[0] || null, 
+    topThree[1] || null, 
+    topThree[2] || null  
+  ];
+
+  // Etwas kompaktere Höhen für "No Scroll" Feeling
+  const getHeight = (rank) => {
+    if (rank === 0) return "h-36 sm:h-44"; // War 48/56
+    if (rank === 1) return "h-28 sm:h-32"; // War 36/40
+    return "h-20 sm:h-24";          // War 28/32
   };
 
-  const t = themeClasses[theme];
+  const getStyles = (rank) => {
+    if (rank === 0) return {
+      container: "bg-gradient-to-b from-yellow-500/20 via-yellow-500/5 to-transparent border-yellow-500/50 border-t-4 shadow-[0_0_30px_rgba(234,179,8,0.2)]",
+      text: "text-yellow-400",
+    };
+    if (rank === 1) return {
+      container: "bg-gradient-to-b from-slate-300/20 via-slate-400/5 to-transparent border-slate-400/30 border-t-2 shadow-[0_0_20px_rgba(148,163,184,0.1)]",
+      text: "text-slate-300",
+    };
+    return {
+      container: "bg-gradient-to-b from-orange-700/20 via-orange-800/5 to-transparent border-orange-700/40 border-t-2 shadow-[0_0_20px_rgba(194,65,12,0.1)]",
+      text: "text-orange-400",
+    };
+  };
+
+  const displayOrder = [1, 0, 2];
 
   return (
-    <div
-      className={`relative flex flex-col justify-end rounded-t-2xl border-t border-x backdrop-blur-sm bg-gradient-to-b ${t.container} ${t.height} transition-all duration-1000 ease-out transform will-change-transform hover:brightness-110`}
-      style={{
-        // Die Animation: Startet unten und unsichtbar, fährt nach oben
-        transform: animate ? "translateY(0)" : "translateY(100%)",
-        opacity: animate ? 1 : 0,
-        transitionDelay: `${delay}ms`, // Verzögerung für Domino-Effekt
-      }}
-    >
-      {/* Große Rang-Zahl im Hintergrund */}
-      <span className={`absolute -top-10 left-1/2 -translate-x-1/2 font-black opacity-10 select-none ${t.rankSize} ${t.text}`}>
-        {rank}
-      </span>
+    <div className="bg-slate-900 rounded-xl border border-white/10 shadow-xl p-4 relative overflow-hidden h-full flex flex-col justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between relative z-10 mb-2 shrink-0">
+        <h2 className="font-bold text-white flex items-center gap-2 text-lg">
+          <Crown size={20} className="text-yellow-500 fill-yellow-500/20" />
+          Leaderboard
+        </h2>
+      </div>
 
-      <div className="p-4 flex flex-col items-center text-center relative z-10 pb-6">
-        {t.icon}
-        
-        {/* Name */}
-        <div className="font-bold text-white text-lg leading-tight truncate w-full">
-          {participant.name}
-        </div>
-
-        {/* Score */}
-        <div className={`text-sm font-medium mt-1 ${t.text}`}>
-          Score: {participant.fairScore ? participant.fairScore.toFixed(1) : "—"}
-        </div>
+      {/* Podium Container */}
+      <div className="flex-1 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:items-end content-end mt-2">
+        {displayOrder.map((positionIndex) => {
+          const player = filledPodium[positionIndex];
+          const isWinner = positionIndex === 0;
+          const styles = getStyles(positionIndex);
           
-         {/* Gewichtsverlust Badge */}
-         {participant.loss > 0 && (
-            <div className="mt-2 text-xs bg-slate-800/80 px-2 py-1 rounded-full text-emerald-400 font-mono">
-              -{participant.loss.toFixed(1)} kg
+          return (
+            <div 
+              key={positionIndex} 
+              className={`relative flex flex-col items-center justify-end ${isWinner ? "order-first sm:order-none z-10" : "z-0"}`}
+            >
+              {player ? (
+                <>
+                  {/* Platzierung Zahl */}
+                  <div className={`
+                    mb-2 font-black text-2xl drop-shadow-lg transition-transform duration-500
+                    ${styles.text} ${isWinner ? "scale-125 -translate-y-1" : "opacity-80"}
+                  `}>
+                    #{positionIndex + 1}
+                  </div>
+
+                  {/* Die Säule */}
+                  <div className={`
+                    w-full rounded-t-2xl border-x backdrop-blur-md relative group
+                    flex flex-col items-center justify-start pt-3 pb-2 px-1 text-center transition-all duration-500
+                    ${styles.container} ${getHeight(positionIndex)}
+                    hover:brightness-125
+                  `}>
+                    
+                    {/* Icon */}
+                    <div className="mb-2">
+                      {isWinner ? (
+                        <Trophy 
+                          size={24} 
+                          className="text-yellow-400 drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] animate-[bounce_3s_infinite]" 
+                        />
+                      ) : (
+                        <Medal size={20} className={`${styles.text} opacity-80`} />
+                      )}
+                    </div>
+
+                    {/* Name */}
+                    <div className="font-bold text-white w-full truncate px-1 text-sm tracking-wide">
+                      {player.name}
+                    </div>
+
+                    {/* Score */}
+                    <div className="mt-auto text-xs font-mono opacity-90 text-slate-300 pb-1">
+                      <span className={`font-bold ${styles.text}`}>
+                        {player.fairScore != null ? player.fairScore.toFixed(2) : "—"}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Leerer Platzhalter */
+                <div className={`w-full ${getHeight(positionIndex)} border-t border-x border-white/5 rounded-t-2xl bg-white/5 opacity-20`} />
+              )}
             </div>
-          )}
+          );
+        })}
       </div>
-    </div>
-  );
-};
 
-
-export default function Podium({ leaderboard }) {
-  // State, um die Animation nach dem Laden zu triggern
-  const [animate, setAnimate] = useState(false);
-
-  useEffect(() => {
-    // Kurze Verzögerung nach dem Mounten, damit die CSS-Transition greift
-    const timer = setTimeout(() => setAnimate(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Wir brauchen mindestens 3 Leute für das volle Podest
-  const top3 = leaderboard.slice(0, 3);
-  const first = top3[0];
-  const second = top3[1];
-  const third = top3[2];
-
-  // Fallback, wenn noch nicht genug Daten da sind
-  if (top3.length < 3) {
-    return (
-      <div className="bg-slate-900 rounded-xl border border-white/10 p-6 h-full flex flex-col items-center justify-center text-center opacity-70">
-        <Trophy className="w-12 h-12 text-slate-600 mb-4" />
-        <h3 className="text-slate-300 font-medium">Podest wird aufgebaut</h3>
-        <p className="text-slate-500 text-sm mt-2">
-          Warte auf mindestens 3 Teilnehmer mit Scores...
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-slate-900/50 rounded-xl border border-white/10 p-6 h-full flex flex-col">
-      <h2 className="text-lg font-bold text-white mb-8 flex items-center gap-2">
-        <Trophy className="text-amber-400" size={20} /> Aktuelles Ranking
-      </h2>
-
-      {/* Container muss overflow-hidden haben, damit die Podeste 
-          beim Start der Animation "unter dem Boden" versteckt sind.
-      */}
-      <div className="flex-1 grid grid-cols-3 gap-4 items-end overflow-hidden pb-2 -mx-2 px-2">
-        {/* Platz 2 (Links) */}
-        <div className="col-start-1">
-          <PodiumStep 
-            participant={second} 
-            rank={2} 
-            theme="silver" 
-            animate={animate} 
-            delay={200} // Fährt als zweites hoch
-          />
-        </div>
-
-        {/* Platz 1 (Mitte, am höchsten) */}
-        <div className="col-start-2 -mt-12 z-10"> {/* z-10 damit es leicht überlappt */}
-          <PodiumStep 
-            participant={first} 
-            rank={1} 
-            theme="gold" 
-            animate={animate} 
-            delay={0} // Fährt zuerst hoch
-          />
-        </div>
-
-        {/* Platz 3 (Rechts) */}
-        <div className="col-start-3">
-          <PodiumStep 
-            participant={third} 
-            rank={3} 
-            theme="bronze" 
-            animate={animate} 
-            delay={400} // Fährt als letztes hoch
-          />
-        </div>
-      </div>
+      {/* Hintergrund */}
+      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-900/10 to-transparent pointer-events-none" />
     </div>
   );
 }
