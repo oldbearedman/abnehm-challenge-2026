@@ -17,26 +17,31 @@ export default function DashboardLayout({
   const safeLeaderboard = leaderboard || [];
   const currentUser = safeLeaderboard.find(p => p.id === activeId);
 
-  // WICHTIG: h-[calc(100vh-80px)] erzwingt Screen-Höhe. overflow-hidden verhindert Scrollen.
   return (
-    <main className="p-3 w-full h-[calc(100vh-80px)] flex flex-col gap-3 overflow-hidden">
+    // WICHTIG:
+    // Mobile: h-auto & overflow-y-auto (Erlaubt Scrollen, zieht sich so lang wie nötig)
+    // Desktop (lg): h-[calc(...)] & overflow-hidden (Fixiert die Höhe, kein Scrollen)
+    <main className="p-3 w-full min-h-[calc(100vh-80px)] lg:h-[calc(100vh-80px)] flex flex-col gap-3 overflow-y-auto lg:overflow-hidden">
       
-      {/* OBERER BEREICH (40% Höhe) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-[4] min-h-0">
+      {/* OBERER BEREICH */}
+      {/* Mobile: min-h-0 fällt weg, Elemente nehmen Platz wie sie brauchen. */}
+      {/* Desktop: flex-[4] teilt den Platz prozentual auf. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0 lg:flex-[4] lg:min-h-0">
         
-        {/* Podium (2/3) */}
-        <div className="lg:col-span-2 h-full">
+        {/* Podium */}
+        <div className="lg:col-span-2 h-[400px] lg:h-full">
            <Podium participants={safeLeaderboard} />
         </div>
         
-        {/* Details Tabelle (1/3) */}
-        <div className="lg:col-span-1 h-full overflow-hidden">
+        {/* Details Tabelle */}
+        <div className="lg:col-span-1 h-[300px] lg:h-full overflow-hidden">
           <div className="bg-slate-900 rounded-xl border border-white/10 shadow-sm flex flex-col h-full">
             <div className="p-3 border-b border-white/10 shrink-0">
               <h2 className="font-bold text-white flex items-center gap-2 text-sm">
                 <Trophy size={16} className="text-yellow-500" /> Details
               </h2>
             </div>
+            
             <div className="flex-1 overflow-x-auto p-1">
               <div className="min-w-[300px]"> 
                 <LeaderboardTable 
@@ -50,22 +55,22 @@ export default function DashboardLayout({
         </div>
       </div>
 
-      {/* UNTERER BEREICH (60% Höhe) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 flex-[6] min-h-0 pb-1">
+      {/* UNTERER BEREICH */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 shrink-0 lg:flex-[6] lg:min-h-0 pb-1">
         
-        {/* Chart (2/3) */}
-        <div className="lg:col-span-2 h-full min-h-[150px]">
+        {/* Chart */}
+        <div className="lg:col-span-2 h-[300px] lg:h-full">
           <ProgressChart 
             chartData={chartData} 
             participants={participants} 
-            compact={true}
+            compact={true} 
           />
         </div>
 
-        {/* RECHTS: TrendBox (oben) + Winners (unten) */}
-        <div className="lg:col-span-1 flex flex-col gap-3 h-full">
+        {/* Trend & Winner (Rechts auf PC, Unten auf Handy) */}
+        <div className="lg:col-span-1 flex flex-col gap-3 lg:h-full">
           
-          {/* TrendBox: Jetzt NEBENEINANDER (flach) */}
+          {/* TrendBox */}
           <div className="h-24 shrink-0">
             <TrendBox 
               currentUser={currentUser} 
@@ -74,8 +79,9 @@ export default function DashboardLayout({
             />
           </div>
 
-          {/* Hall of Fame: Füllt den Rest */}
-          <div className="flex-1 min-h-0 overflow-hidden">
+          {/* Hall of Fame */}
+          {/* Mobile: Feste Höhe, damit man es sieht. Desktop: Füllt Rest auf. */}
+          <div className="h-[200px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
             <MonthlyWinners />
           </div>
 
